@@ -1,0 +1,227 @@
+%% LINEAS EQUIPOTENCIALES - DOS ELECTRODOS PUNTUALES
+clear; clc; close all;
+
+%% 1. Datos
+V0 = 10.1;              % Voltaje de la fuente [V]
+q1 = [5 10];            % Electrodo positivo
+q2 = [20 10];           % Electrodo negativo
+a = 0.5;                % Radio aproximado de los electrodos
+d = norm(q2 - q1);      % Distancia entre electrodos
+
+niveles = [4 6 7 8];     % Voltajes de las lineas equipotenciales
+ptsPorLinea = 3;        % Tres puntos por linea
+
+%% 2. Malla y calculo del potencial
+h = 0.05;
+
+[X,Y] = meshgrid(0:h:25, 0:h:20);
+
+r1 = max(hypot(X-q1(1), Y-q1(2)), 1e-3);
+r2 = max(hypot(X-q2(1), Y-q2(2)), 1e-3);
+
+K = (V0/2)/log(d/a);
+
+V = V0/2 + K*log(r2./r1);
+
+%% 3. Figura 1: lineas equipotenciales
+figure('Color','w','Units','pixels', ...
+       'Position',[50 50 820 660]);
+
+hold on;
+box on;
+
+% Cuadricula tipo papel milimetrado
+niv = {0.1, [1.00 0.88 0.82], 0.3;
+       0.5, [1.00 0.72 0.60], 0.6;
+       1.0, [0.95 0.45 0.30], 1.0};
+
+for k = 1:3
+    px = 0:niv{k,1}:25;
+    py = 0:niv{k,1}:20;
+
+    plot([px; px], repmat([0;20],1,numel(px)), ...
+         'Color',niv{k,2},'LineWidth',niv{k,3}, ...
+         'HandleVisibility','off');
+
+    plot(repmat([0;25],1,numel(py)), [py;py], ...
+         'Color',niv{k,2},'LineWidth',niv{k,3}, ...
+         'HandleVisibility','off');
+end
+
+axis equal;
+xlim([0 25]);
+ylim([0 20]);
+
+set(gca,'XTick',0:5:25,'YTick',0:5:20,'Layer','top');
+
+xlabel('x (cm)');
+ylabel('y (cm)');
+title(sprintf('Lineas equipotenciales - Dos electrodos puntuales (%.1f V)',V0));
+
+%% 4. Trazado de las lineas equipotenciales
+[C,hc] = contour(X,Y,V,niveles, ...
+                 'LineColor','k','LineWidth',1.3);
+
+clabel(C,hc,'FontWeight','bold');
+
+%% 5. Representacion de los electrodos
+plot(q1(1),q1(2),'ro','MarkerSize',10,'MarkerFaceColor','r');
+plot(q2(1),q2(2),'bo','MarkerSize',10,'MarkerFaceColor','b');
+
+text(q1(1),q1(2)-1.2,'+ (5,10)', ...
+     'HorizontalAlignment','center');
+
+text(q2(1),q2(2)-1.2,'- (20,10)', ...
+     'HorizontalAlignment','center');
+
+%% 6. Seleccion de tres puntos por linea equipotencial
+pts = [];
+
+for L = niveles
+
+    Cc = contourc(0:h:25,0:h:20,V,[L L]);
+
+    k = 1;
+
+    while k < size(Cc,2)
+
+        n = Cc(2,k);
+        seg = Cc(:,k+1:k+n);
+
+        % Seleccionar tres puntos distribuidos sobre cada segmento
+        idx = unique(round(linspace(1,n,ptsPorLinea)));
+
+        % Evitar segmentos demasiado pequenos
+        if numel(idx) == ptsPorLinea
+            pts = [pts; seg(:,idx)', ...
+                   L*ones(ptsPorLinea,1)];
+        end
+
+        k = k+n+1;
+    end
+end
+
+% Marcar los puntos en la figura
+plot(pts(:,1),pts(:,2),'k.','MarkerSize',18);
+
+%% 7. Tabla de coordenadas de los puntos teoricos
+T = array2table(round(pts,2), ...
+    'VariableNames',{'x_cm','y_cm','Voltaje_V'});
+
+disp('PUNTOS TEORICOS DE LAS LINEAS EQUIPOTENCIALES:');
+disp(T);
+
+%% 8. Puntos experimentales (leidos de la hoja de la practica)
+% Cada fila es [x y] en cm, ordenada a lo largo de la curva.
+% Son valores estimados a ojo de la foto: ajustalos con tu tabla si hace falta.
+p8 = [3 10; 6 11; 5.8 8.5];                      % 8 V: anillo cerrado alrededor de +
+p7 = [0 0; 2.5 2.2; 4.1 3.6; 5.1 5.1; 7.0 8.0; ...
+      7.6 10; 6.8 12.9; 4.5 15; 2.7 17; 1.6 18.1]; % 7 V: arco abierto
+p6 = [8.1 1.3; 8.6 3.2; 9.1 5.1; 9.0 6.8; ...
+      9.5 10; 9.7 11; 8.9 14.4; 6.9 17];           % 6 V: arco abierto
+p3 = [20 2.3; 18 5.2; 17 7.2; 16.5 10; ...
+      17 12.1; 17 13; 17.6 14.9; 19 17.5];         % 3 V: arco abierto
+x4 = 12;                                           % linea vertical en x = 12
+Vlinea = 4.7;                                      % voltaje de esa linea (pon 4 si es 4 V)
+
+%% 9. Figura 2: comparacion teoria vs practica
+figure('Color','w','Units','pixels', ...
+       'Position',[900 50 820 660]);
+
+hold on;
+box on;
+
+% Cuadricula tipo papel milimetrado
+for k = 1:3
+    px = 0:niv{k,1}:25;
+    py = 0:niv{k,1}:20;
+
+    plot([px; px], repmat([0;20],1,numel(px)), ...
+         'Color',niv{k,2},'LineWidth',niv{k,3}, ...
+         'HandleVisibility','off');
+
+    plot(repmat([0;25],1,numel(py)), [py;py], ...
+         'Color',niv{k,2},'LineWidth',niv{k,3}, ...
+         'HandleVisibility','off');
+end
+
+axis equal;
+xlim([0 25]);
+ylim([0 20]);
+set(gca,'XTick',0:5:25,'YTick',0:5:20,'Layer','top');
+
+xlabel('x (cm)');
+ylabel('y (cm)');
+title('Comparacion: lineas equipotenciales teoricas vs. practica');
+
+% Colores por nivel de voltaje
+col3 = [0.49 0.18 0.56];   % 3 V
+col4 = [0.85 0.33 0.10];   % linea vertical (Vlinea)
+col6 = [0.00 0.45 0.74];   % 6 V
+col7 = [0.93 0.69 0.13];   % 7 V
+col8 = [0.64 0.08 0.18];   % 8 V
+
+% Lineas teoricas (simuladas): continuas y delgadas
+contour(X,Y,V,[3 3],'LineColor',col3,'LineWidth',1.2,'HandleVisibility','off');
+contour(X,Y,V,[Vlinea Vlinea],'LineColor',col4,'LineWidth',1.2,'HandleVisibility','off');
+contour(X,Y,V,[6 6],'LineColor',col6,'LineWidth',1.2,'HandleVisibility','off');
+contour(X,Y,V,[7 7],'LineColor',col7,'LineWidth',1.2,'HandleVisibility','off');
+contour(X,Y,V,[8 8],'LineColor',col8,'LineWidth',1.2,'HandleVisibility','off');
+
+% Electrodos
+plot(q1(1),q1(2),'ro','MarkerSize',10,'MarkerFaceColor','r', ...
+     'HandleVisibility','off');
+plot(q2(1),q2(2),'bo','MarkerSize',10,'MarkerFaceColor','b', ...
+     'HandleVisibility','off');
+text(q1(1),q1(2)-1.2,'+ (5,10)','HorizontalAlignment','center');
+text(q2(1),q2(2)-1.2,'- (20,10)','HorizontalAlignment','center');
+
+% --- Practica 8 V: curva suave y cerrada alrededor de + ---
+th = atan2(p8(:,2)-q1(2), p8(:,1)-q1(1));
+rr = hypot(p8(:,1)-q1(1), p8(:,2)-q1(2));
+[th,ord] = sort(th);
+rr = rr(ord);
+thx = [th-2*pi; th; th+2*pi];
+rrx = [rr; rr; rr];
+tt  = linspace(th(1), th(1)+2*pi, 400);
+rrr = pchip(thx, rrx, tt);
+plot(q1(1)+rrr.*cos(tt), q1(2)+rrr.*sin(tt), '--', ...
+     'Color',col8,'LineWidth',2.8,'DisplayName','8 V (practica)');
+
+% --- Practica 7 V, 6 V y 3 V: arcos abiertos suaves ---
+arcos = {p7, col7, '7 V (practica)';
+         p6, col6, '6 V (practica)';
+         p3, col3, '3 V (practica)'};
+
+for g = 1:size(arcos,1)
+    P  = arcos{g,1};
+    s  = [0; cumsum(hypot(diff(P(:,1)), diff(P(:,2))))];   % longitud acumulada
+    ss = linspace(0, s(end), 400);
+    xs = pchip(s, P(:,1), ss);
+    ys = pchip(s, P(:,2), ss);
+    plot(xs, ys, '--', 'Color', arcos{g,2}, 'LineWidth', 2.8, ...
+         'DisplayName', arcos{g,3});
+end
+
+% --- Linea vertical medida en la practica ---
+plot([x4 x4],[0 20],'--','Color',col4,'LineWidth',2.8, ...
+     'DisplayName',sprintf('%.1f V (practica, x = %g)',Vlinea,x4));
+
+% Para ver tambien los puntos leidos, quita los % de estas lineas:
+% plot(p8(:,1),p8(:,2),'k.','MarkerSize',14,'HandleVisibility','off');
+% plot(p7(:,1),p7(:,2),'k.','MarkerSize',14,'HandleVisibility','off');
+% plot(p6(:,1),p6(:,2),'k.','MarkerSize',14,'HandleVisibility','off');
+% plot(p3(:,1),p3(:,2),'k.','MarkerSize',14,'HandleVisibility','off');
+
+% Entradas de leyenda para identificar teoria vs practica
+plot(NaN,NaN,'-','Color',[0.3 0.3 0.3],'LineWidth',1.2, ...
+     'DisplayName','Teoricas (lineas continuas finas)');
+plot(NaN,NaN,'--','Color',[0.3 0.3 0.3],'LineWidth',2.8, ...
+     'DisplayName','Practica (lineas discontinuas gruesas)');
+
+legend('Location','eastoutside');
+
+%% 10. Guardar figuras y tabla (opcional)
+% figure(1); exportgraphics(gcf,'Figura1_Equipotenciales.png','Resolution',300);
+% figure(2); exportgraphics(gcf,'Figura2_Comparacion.png','Resolution',300);
+% writetable(T,'Puntos_Teoricos.csv');
