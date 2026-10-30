@@ -1,0 +1,168 @@
+%% LINEAS EQUIPOTENCIALES - MONTAJE 3: DOS PLACAS PARALELAS
+clear; clc; close all;
+
+%% 1. Datos
+V0 = 10.1;              % Voltaje de la fuente [V]
+
+% Placa negativa (0 V): de (5,4) a (5,11.5), 1 cm de ancho hacia la izquierda
+xn = [4 5];    yn = [4 11.5];
+% Placa positiva (V0): de (21,4.5) a (21,11.5), 1 cm de ancho hacia la izquierda
+xp = [20 21];  yp = [4.5 11.5];
+
+niveles = [3 5 7];      % Voltajes de las lineas equipotenciales
+
+%% 2. Potencial por el metodo de cargas equivalentes
+% Cada placa se reemplaza por cargas lineales sobre su eje. Las cargas se
+% ajustan para que el potencial sea 0 V en la placa negativa y V0 en la
+% positiva (carga neta nula).
+N  = 40;
+srcN = [repmat(mean(xn),N,1), linspace(yn(1),yn(2),N)'];
+srcP = [repmat(mean(xp),N,1), linspace(yp(1),yp(2),N)'];
+S    = [srcN; srcP];
+
+t  = linspace(0,1,60)';
+borde = @(xb,yb) [xb(1)*ones(60,1), yb(1)+diff(yb)*t;
+                  xb(2)*ones(60,1), yb(1)+diff(yb)*t;
+                  xb(1)+diff(xb)*t, yb(1)*ones(60,1);
+                  xb(1)+diff(xb)*t, yb(2)*ones(60,1)];
+pN = borde(xn,yn);
+pP = borde(xp,yp);
+
+Afun = @(P) -log(max(hypot(P(:,1)-S(:,1)', P(:,2)-S(:,2)'),1e-6));
+
+M = [Afun(pN) ones(size(pN,1),1);
+     Afun(pP) ones(size(pP,1),1);
+     ones(1,size(S,1)) 0];
+b = [0*ones(size(pN,1),1); V0*ones(size(pP,1),1); 0];
+sol = M\b;                                                % minimos cuadrados
+
+Vfun = @(P) [Afun(P) ones(size(P,1),1)]*sol;              % V en puntos [x y]
+
+h = 0.05;
+[X,Y] = meshgrid(0:h:25, 0:h:20);
+V = reshape(Vfun([X(:) Y(:)]), size(X));
+
+%% 3. Puntos experimentales (x y)
+p3 = [9 18; 8.5 14; 6 8];        % 3 V
+p5 = [15 15; 15 17; 12.5 5];     % 5 V
+p7 = [17 4; 19 10; 14 0.5];      % 7 V
+exper = {p3, 3; p5, 5; p7, 7};
+
+%% 4. Cuadricula tipo papel milimetrado
+niv = {0.1, [1.00 0.88 0.82], 0.3;
+       0.5, [1.00 0.72 0.60], 0.6;
+       1.0, [0.95 0.45 0.30], 1.0};
+
+%% 5. Figura 1: lineas equipotenciales simuladas
+figure('Color','w','Units','pixels','Position',[50 50 820 660]);
+hold on; box on;
+for k = 1:3
+    px = 0:niv{k,1}:25;  py = 0:niv{k,1}:20;
+    plot([px; px], repmat([0;20],1,numel(px)), 'Color',niv{k,2}, ...
+         'LineWidth',niv{k,3},'HandleVisibility','off');
+    plot(repmat([0;25],1,numel(py)), [py;py], 'Color',niv{k,2}, ...
+         'LineWidth',niv{k,3},'HandleVisibility','off');
+end
+axis equal; xlim([0 25]); ylim([0 20]);
+set(gca,'XTick',0:5:25,'YTick',0:5:20,'Layer','top');
+xlabel('x (cm)'); ylabel('y (cm)');
+title(sprintf('Lineas equipotenciales - Placas paralelas (%.1f V)',V0));
+
+[C,hc] = contour(X,Y,V,niveles,'LineColor','k','LineWidth',1.3);
+clabel(C,hc,'FontWeight','bold');
+
+% Placas
+rectangle('Position',[xn(1) yn(1) diff(xn) diff(yn)],'FaceColor','b','EdgeColor','b');
+rectangle('Position',[xp(1) yp(1) diff(xp) diff(yp)],'FaceColor','r','EdgeColor','r');
+text(mean(xn),yn(1)-1.2,'- (0 V)','HorizontalAlignment','center');
+text(mean(xp),yp(1)-1.2,sprintf('+ (%.1f V)',V0),'HorizontalAlignment','center');
+
+% Voltaje al pasar el cursor
+activarHover(gcf,gca,Vfun);
+
+%% 6. Tabla: puntos experimentales, potencial teorico y error
+fila = [];
+for g = 1:size(exper,1)
+    P  = exper{g,1};
+    Vm = exper{g,2}*ones(size(P,1),1);       % potencial medido
+    Vt = Vfun(P);                            % potencial teorico en (x,y)
+    er = abs(Vt-Vm)./Vt*100;
+    fila = [fila; P Vm Vt er];
+end
+T = array2table(round(fila,2),'VariableNames', ...
+    {'x_cm','y_cm','V_medido','V_teorico','Error_pct'});
+T.Punto = (1:height(T))'; T = movevars(T,'Punto','Before',1);
+disp('PUNTOS EXPERIMENTALES VS TEORICOS (MONTAJE 3):'); disp(T);
+
+%% 7. Figura 2: comparacion teoria vs practica
+figure('Color','w','Units','pixels','Position',[900 50 820 660]);
+hold on; box on;
+for k = 1:3
+    px = 0:niv{k,1}:25;  py = 0:niv{k,1}:20;
+    plot([px; px], repmat([0;20],1,numel(px)), 'Color',niv{k,2}, ...
+         'LineWidth',niv{k,3},'HandleVisibility','off');
+    plot(repmat([0;25],1,numel(py)), [py;py], 'Color',niv{k,2}, ...
+         'LineWidth',niv{k,3},'HandleVisibility','off');
+end
+axis equal; xlim([0 25]); ylim([0 20]);
+set(gca,'XTick',0:5:25,'YTick',0:5:20,'Layer','top');
+xlabel('x (cm)'); ylabel('y (cm)');
+title('Comparacion: lineas equipotenciales teoricas vs. practica');
+
+col3 = [0.49 0.18 0.56];   % 3 V
+col5 = [0.00 0.45 0.74];   % 5 V
+col7 = [0.93 0.69 0.13];   % 7 V
+cols = {col3, col5, col7};
+
+% Teoricas: continuas y delgadas
+contour(X,Y,V,[3 3],'LineColor',col3,'LineWidth',1.2,'HandleVisibility','off');
+contour(X,Y,V,[5 5],'LineColor',col5,'LineWidth',1.2,'HandleVisibility','off');
+contour(X,Y,V,[7 7],'LineColor',col7,'LineWidth',1.2,'HandleVisibility','off');
+
+% Placas
+rectangle('Position',[xn(1) yn(1) diff(xn) diff(yn)],'FaceColor','b','EdgeColor','b');
+rectangle('Position',[xp(1) yp(1) diff(xp) diff(yp)],'FaceColor','r','EdgeColor','r');
+text(mean(xn),yn(1)-1.2,'- (0 V)','HorizontalAlignment','center');
+text(mean(xp),yp(1)-1.2,sprintf('+ (%.1f V)',V0),'HorizontalAlignment','center');
+
+% Practica: arcos suaves (discontinuos y gruesos)
+for g = 1:size(exper,1)
+    P  = sortrows(exper{g,1},2);             % ordenados por y a lo largo de la curva
+    s  = [0; cumsum(hypot(diff(P(:,1)), diff(P(:,2))))];
+    ss = linspace(0, s(end), 400);
+    plot(pchip(s,P(:,1),ss), pchip(s,P(:,2),ss),'--','Color',cols{g}, ...
+         'LineWidth',2.8,'DisplayName',sprintf('%d V (practica)',exper{g,2}));
+end
+
+% Para ver tambien los puntos leidos, quita los % de esta linea:
+% plot(fila(:,1),fila(:,2),'k.','MarkerSize',14,'HandleVisibility','off');
+
+plot(NaN,NaN,'-','Color',[0.3 0.3 0.3],'LineWidth',1.2, ...
+     'DisplayName','Teoricas (lineas continuas finas)');
+plot(NaN,NaN,'--','Color',[0.3 0.3 0.3],'LineWidth',2.8, ...
+     'DisplayName','Practica (lineas discontinuas gruesas)');
+legend('Location','eastoutside');
+activarHover(gcf,gca,Vfun);   % voltaje teorico al pasar el cursor
+
+%% 8. Guardar figuras y tabla (opcional)
+% figure(1); exportgraphics(gcf,'Montaje3_Simulacion.png','Resolution',300);
+% figure(2); exportgraphics(gcf,'Montaje3_Comparacion.png','Resolution',300);
+% writetable(T,'Montaje3_Puntos.csv');
+
+%% Funciones locales: muestran el voltaje teorico bajo el cursor
+function activarHover(fig,ax,Vfun)
+    txt = text(ax,0.3,19.2,'','BackgroundColor','w','EdgeColor','k', ...
+               'FontWeight','bold','VerticalAlignment','top', ...
+               'HandleVisibility','off');
+    set(fig,'WindowButtonMotionFcn',@(~,~) mover(ax,Vfun,txt));
+end
+
+function mover(ax,Vfun,txt)
+    cp = ax.CurrentPoint(1,1:2);
+    if cp(1)>=0 && cp(1)<=25 && cp(2)>=0 && cp(2)<=20
+        txt.String = sprintf('x = %.2f cm   y = %.2f cm   V = %.2f V', ...
+                             cp(1),cp(2),Vfun(cp));
+    else
+        txt.String = '';
+    end
+end
